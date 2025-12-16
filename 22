@@ -1,0 +1,38 @@
+# classes.py
+class CityPlace:
+    def __init__(self, place_id, name, address, hours, price, description):
+        self.id = place_id
+        self.name = name
+        self.address = address
+        self.hours = hours
+        self.price = price
+        self.description = description
+    
+    def to_file_string(self):
+        return f"{self.id}&{self.name}&{self.address}&{self.hours}&{self.price}&{self.description}"
+    
+    @staticmethod
+    def from_file_string(data_string):
+        parts = data_string.strip().split('&')
+        if len(parts) == 6:
+            return CityPlace(parts[0], parts[1], parts[2], parts[3], parts[4], parts[5])
+        return None
+
+class CityGuideData:
+    def __init__(self):
+        self.places = []
+        self.next_id = 1
+    
+    def add_place(self, place):
+        place.id = str(self.next_id)
+        self.next_id += 1
+        self.places.append(place)
+    
+    def remove_place(self, index):
+        if 0 <= index < len(self.places):
+            del self.places[index]
+    
+    def update_place(self, index, place):
+        if 0 <= index < len(self.places):
+            place.id = self.places[index].id
+            self.places[index] = place
