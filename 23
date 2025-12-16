@@ -1,0 +1,111 @@
+# main.py
+import sys
+from PyQt5 import uic
+from PyQt5.QtWidgets import QApplication, QMainWindow, QTableWidgetItem
+from classes import CityPlace, CityGuideData
+
+class CityGuideApp(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        uic.loadUi('city_guide.ui', self)
+        self.data = CityGuideData()
+        
+        self.addButton.clicked.connect(self.add_record)
+        self.editButton.clicked.connect(self.edit_record)
+        self.deleteButton.clicked.connect(self.delete_record)
+        self.loadButton.clicked.connect(self.load_from_file)
+        
+        self.load_from_file()
+        self.update_table()
+    
+    def update_table(self):
+        self.tableWidget.setRowCount(len(self.data.places))
+        for row, place in enumerate(self.data.places):
+            self.tableWidget.setItem(row, 0, QTableWidgetItem(place.id))
+            self.tableWidget.setItem(row, 1, QTableWidgetItem(place.name))
+            self.tableWidget.setItem(row, 2, QTableWidgetItem(place.address))
+            self.tableWidget.setItem(row, 3, QTableWidgetItem(place.hours))
+            self.tableWidget.setItem(row, 4, QTableWidgetItem(place.price))
+            self.tableWidget.setItem(row, 5, QTableWidgetItem(place.description))
+    
+    def get_current_index(self):
+        selected = self.tableWidget.selectedItems()
+        return selected[0].row() if selected else -1
+    
+    def clear_inputs(self):
+        self.nameEdit.clear()
+        self.addressEdit.clear()
+        self.hoursEdit.clear()
+        self.priceEdit.clear()
+        self.descriptionEdit.clear()
+    
+    def get_input_data(self):
+        return CityPlace(
+            place_id="0",
+            name=self.nameEdit.text(),
+            address=self.addressEdit.text(),
+            hours=self.hoursEdit.text(),
+            price=self.priceEdit.text(),
+            description=self.descriptionEdit.text()
+        )
+    
+    def add_record(self):
+        place = self.get_input_data()
+        self.data.add_place(place)
+        self.save_to_file()
+        self.update_table()
+        self.clear_inputs()
+    
+    def edit_record(self):
+        index = self.get_current_index()
+        if index >= 0:
+            place = self.get_input_data()
+            self.data.update_place(index, place)
+            self.save_to_file()
+            self.update_table()
+            self.clear_inputs()
+    
+    def delete_record(self):
+        index = self.get_current_index()
+        if index >= 0:
+            self.data.remove_place(index)
+            self.save_to_file()
+            self.update_table()
+    
+    def load_from_file(self):
+        try:
+            with open('city_guide.txt', 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+            
+            self.data.places.clear()
+            max_id = 0
+            
+            for line in lines:
+                if line.strip():
+                    place = CityPlace.from_file_string(line)
+                    if place:
+                        self.data.places.append(place)
+                        try:
+                            current_id = int(place.id)
+                            if current_id > max_id:
+                                max_id = current_id
+                        except ValueError:
+                            pass
+            
+            self.data.next_id = max_id + 1 if self.data.places else 1
+            self.update_table()
+        except FileNotFoundError:
+            self.data.places.clear()
+            self.data.next_id = 1
+            self.update_table()
+    
+    def save_to_file(self):
+        with open('city_guide.txt', 'w', encoding='utf-8') as f:
+            for place in self.data.places:
+                f.write(place.to_file_string() + '\n')
+
+if __name__ == '__main__':
+    app = QApplication(sys.argv)
+    window = CityGuideApp()
+    window.show()
+    sys.exit(app.exec_())
