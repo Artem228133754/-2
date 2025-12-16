@@ -1,0 +1,129 @@
+import sys
+from PyQt5 import uic
+from PyQt5.QtWidgets import QApplication, QMainWindow, QTableWidgetItem, QDialog
+from classes import CityPlace, CityGuideData
+
+class EditDialog(QDialog):
+    def __init__(self, parent=None, place=None):
+        super().__init__(parent)
+        uic.loadUi('edit_form.ui', self)
+        
+        if place:
+            self.nameEdit.setText(place.name)
+            self.addressEdit.setText(place.address)
+            self.hoursEdit.setText(place.hours)
+            self.priceEdit.setText(place.price)
+            self.descriptionEdit.setPlainText(place.description)          
+        self.saveButton.clicked.connect(self.accept)
+        self.cancelButton.clicked.connect(self.reject)
+    
+    def get_data(self):
+        return CityPlace(
+            place_id="0",
+            name=self.nameEdit.text(),
+            address=self.addressEdit.text(),
+            hours=self.hoursEdit.text(),
+            price=self.priceEdit.text(),
+            description=self.descriptionEdit.toPlainText        )
+
+class CityGuideApp(QMainWindow):
+    SORT_ATTRIBUTE = "price"
+    
+    def __init__(self):
+        super().__init__()
+        uic.loadUi('city_guide.ui', self)
+        self.data = CityGuideData()
+        
+        self.addButton.clicked.connect(self.add_record)
+        self.editButton.clicked.connect(self.edit_record)
+        self.deleteButton.clicked.connect(self.delete_record)
+        self.loadButton.clicked.connect(self.load_from_file)
+        self.searchButton.clicked.connect(self.search_record)
+        self.sortButton.clicked.connect(self.sort_records)
+        
+        self.load_from_file()
+    
+    def update_table(self, places=None):
+        if places is None:
+            places = self.data.places
+            
+        self.tableWidget.setRowCount(len(places))
+        for row, place in enumerate(places):
+            self.tableWidget.setItem(row, 0, QTableWidgetItem(place.id))
+            self.tableWidget.setItem(row, 1, QTableWidgetItem(place.name))
+            self.tableWidget.setItem(row, 2, QTableWidgetItem(place.address))
+            self.tableWidget.setItem(row, 3, QTableWidgetItem(place.hours))
+            self.tableWidget.setItem(row, 4, QTableWidgetItem(place.price))
+            self.tableWidget.setItem(row, 5, QTableWidgetItem(place.description))
+    
+    def get_current_index(self):
+        selected = self.tableWidget.selectedItems()
+        return selected[0].row() if selected else -1
+    
+    def add_record(self):
+        dialog = EditDialog(self)
+        if dialog.exec_() == QDialog.Accepted:
+            place = dialog.get_data()
+            self.data.add_place(place)
+            self.save_to_file()
+            self.load_from_file()
+    
+    def edit_record(self):
+        index = self.get_current_index()
+        if index >= 0:
+            dialog = EditDialog(self, self.data.places[index])
+            if dialog.exec_() == QDialog.Accepted:
+                place = dialog.get_data()
+                self.data.update_place(index, place)
+                self.save_to_file()
+                self.load_from_file()
+    
+    def delete_record(self):
+        index = self.get_current_index()
+        if index >= 0:
+            self.data.remove_place(index)
+            self.save_to_file()
+            self.load_from_file()
+    
+    def search_record(self):
+        search_text = self.searchEdit.text().lower()
+        if search_text:
+            filtered = [place for place in self.data.places 
+                       if search_text in place.name.lower()]
+            self.update_table(filtered)
+    
+    def sort_records(self):
+        if self.SORT_ATTRIBUTE == "price":
+            sorted_places = sorted(self.data.places, 
+                                 key=lambda x: float(x.price))
+            self.update_table(sorted_places)
+    
+    def load_from_file(self):
+        try:
+            with open('city_guide.txt', 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+        except FileNotFoundError:
+            lines = []
+        
+        self.data.places.clear()
+        max_id = 0
+        
+        for line in lines:
+            place = CityPlace.from_file_string(line)
+            if place:
+                self.data.places.append(place)
+                max_id = max(max_id, int(place.id))
+        
+        self.data.next_id = max_id + 1
+        self.update_table()
+    
+    def save_to_file(self):
+        with open('city_guide.txt', 'w', encoding='utf-8') as f:
+            for place in self.data.places:
+                f.write(place.to_file_string() + '\n')
+
+if __name__ == '__main__':
+    app = QApplication(sys.argv)
+    window = CityGuideApp()
+    window.show()
+    sys.exit(app.exec_())
